@@ -2,6 +2,7 @@ import argparse
 import os
 import requests
 import threading
+import time
 
 class Downloader:
         def __init__(self):
@@ -18,14 +19,12 @@ class Downloader:
             args = parser.parse_args()
             self.t_count = args.threads
             self.url = args.url
-            if self.url.endswith('/'):
-                self.url += "index.html"
 
 
         def download(self):
             headers = {'Accept-Encoding': "identity"}
             h_r = requests.get(self.url, headers = headers)
-            print h_r.headers
+#            print h_r.headers
             if 'content-length' not in h_r.headers:
                 return
             length = int(h_r.headers['content-length'])
@@ -34,6 +33,7 @@ class Downloader:
             bytes_per_thread = length / self.t_count
             ranges = self.chunks(list(xrange(0, length)), bytes_per_thread)
 
+            s_time = time.time()
             threads = []
             for range in ranges:
 #                print range
@@ -44,10 +44,19 @@ class Downloader:
                 t.start()
             for t in threads:
                 t.join()
+            f_time = time.time()
+            t_time = f_time - s_time
 
-            with open(self.downloads_dir + self.url.strip("http\/\/:"), 'wb') as f:
+            parts = self.url.rpartition('/')
+            file_name = parts[2]
+            if not file_name:
+                file_name = "index.html"
+
+            with open(file_name, 'wb') as f:
                 for t in threads:
                     f.write(t.content)
+
+            print "{0} {1} {2} {3}".format(self.url, self.t_count, length, t_time)
 
 
 
@@ -61,12 +70,12 @@ class DownThread(threading.Thread):
         self.range = range
         threading.Thread.__init__(self)
         self._content_consumed = False
-        self.content = []
+        self.content = ""
 
     def run(self):
         low = self.range[0]
         high = self.range[1]
-        print "Downloading bytes {0} to {1} - {2}".format(low, high, self.url)
+#        print "Downloading bytes {0} to {1} - {2}".format(low, high, self.url)
         headers = \
             {
                 'Accept-Encoding': "identity",
